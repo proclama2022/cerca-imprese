@@ -19,28 +19,36 @@ def search_companies(ateco, fatturato_min, fatturato_max, provincia, num_risulta
     headers = {"Authorization": f"Bearer {openapi_api_key}"}
     params = {
         "atecoCode": ateco,
+        "dataEnrichment": "advanced",
+        "activityStatus": "ATTIVA",
         "minTurnover": fatturato_min,
         "maxTurnover": fatturato_max,
         "province": provincia.upper(),
         "limit": min(num_risultati, 1000)
     }
     response = requests.get(url, params=params, headers=headers)
-    return response.json().get('data', [])
 
-def process_with_gpt4(data) -> str:
+    if response.status_code != 200:
+        return []
+    else:
+        return response.json().get('data', [])
+
+def process_with_gpt4(data):
     if st.session_state.openai_client is None:
         st.error("Client OpenAI non inizializzato. Controlla la chiave API.")
-        return ""
+        return
 
-    prompt = f"Analizza e riassumi i seguenti dati sulle aziende in una tabella markdown: {data}"
-    response = st.session_state.openai_client.chat.completions.create(
+    prompt = f"Dati sulle aziende: {data}"
+    stream = st.session_state.openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "Sei un assistente esperto in analisi di dati aziendali."},
+            {"role": "system", "content": "Sei un assistente esperto in analisi di dati aziendali. Analizza e riassumi i dati forniti dall'utente in una tabella. Non fornire i dati grezzi al termine dell'analisi."},
             {"role": "user", "content": prompt}
-        ]
+        ],
+        stream=True
     )
-    return response.choices[0].message.content
+    
+    return (chunk.choices[0].delta.content for chunk in stream if chunk.choices[0].delta.content is not None)
 
 st.title("Ricerca Aziende per Codice ATECO")
 
@@ -61,12 +69,11 @@ if st.button("Cerca"):
             results = search_companies(ateco, fatturato_min, fatturato_max, provincia, num_risultati)
             
             if results:
-                # Elaborazione con GPT-4
-                analysis = process_with_gpt4(results)
-                
-                # Visualizzazione dei risultati
+                # Elaborazione con GPT-4 e visualizzazione in streaming
                 st.subheader("Analisi dei risultati")
-                st.markdown(analysis)
+                analysis_stream = process_with_gpt4(results)
+                
+                full_response = st.write_stream(analysis_stream)
                 
                 st.subheader("Dati grezzi")
                 st.json(results)
