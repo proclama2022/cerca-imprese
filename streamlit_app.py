@@ -21,7 +21,7 @@ def search_companies(ateco, fatturato_min, fatturato_max, provincia, num_risulta
         "atecoCode": ateco,
         "minTurnover": fatturato_min,
         "maxTurnover": fatturato_max,
-        "province": provincia,
+        "province": provincia.upper(),
         "limit": min(num_risultati, 1000)
     }
     response = requests.get(url, params=params, headers=headers)
@@ -47,7 +47,7 @@ st.title("Ricerca Aziende per Codice ATECO")
 ateco = st.text_input("Codice ATECO (senza punti)", max_chars=6)
 fatturato_min = st.number_input("Fatturato minimo", min_value=0)
 fatturato_max = st.number_input("Fatturato massimo", min_value=0)
-provincia = st.text_input("Provincia")
+provincia = st.text_input("Provincia", max_chars=2)
 num_risultati = st.number_input("Numero di risultati (max 1000)", min_value=1, max_value=1000, value=10)
 
 if st.button("Cerca"):
